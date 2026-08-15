@@ -28,6 +28,11 @@ func TestLoadCatalogModelsFromJSONDropsFreeProductSurfaceAndTagsPricing(t *testi
 				"id": "cline-free/hidden",
 				"name": "Hidden Free"
 			},
+			"cline-pass/deepseek-v4-flash": {
+				"id": "cline-pass/deepseek-v4-flash",
+				"name": "DeepSeek V4 Flash",
+				"pricing": {"input": 0.14, "output": 0.28}
+			},
 			"deepseek/deepseek-v4-flash": {
 				"id": "deepseek/deepseek-v4-flash",
 				"name": "DeepSeek V4 Flash",
@@ -63,6 +68,9 @@ func TestLoadCatalogModelsFromJSONDropsFreeProductSurfaceAndTagsPricing(t *testi
 	if byID["deepseek/deepseek-v4-flash"].Description != "DeepSeek V4 Flash (free)" {
 		t.Fatalf("free label = %q", byID["deepseek/deepseek-v4-flash"].Description)
 	}
+	if byID["cline-pass/deepseek-v4-flash"].Description != "DeepSeek V4 Flash" {
+		t.Fatalf("paid twin label = %q", byID["cline-pass/deepseek-v4-flash"].Description)
+	}
 	if byID["poolside/laguna-s-2.1:free"].Description != "Laguna S 2.1 (free)" {
 		t.Fatalf("already-tagged free label = %q", byID["poolside/laguna-s-2.1:free"].Description)
 	}
@@ -74,6 +82,7 @@ func TestLoadCatalogModelsFromJSONDropsFreeProductSurfaceAndTagsPricing(t *testi
 	}
 	wantOrder := []string{
 		"cline-pass/qwen3.8-max",
+		"cline-pass/deepseek-v4-flash",
 		"deepseek/deepseek-v4-flash",
 		"poolside/laguna-s-2.1:free",
 	}

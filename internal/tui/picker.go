@@ -654,7 +654,15 @@ func modelPickerDisplayName(id string, description string) string {
 	for index, word := range words {
 		words[index] = modelPickerTitleWord(word)
 	}
-	return strings.Join(words, " ")
+	title := strings.Join(words, " ")
+	if catalogMarksFree(description) && !strings.Contains(strings.ToLower(title), "free") {
+		title += " (free)"
+	}
+	return title
+}
+
+func catalogMarksFree(description string) bool {
+	return strings.Contains(strings.ToLower(description), "(free)")
 }
 
 func modelPickerTitleWord(word string) string {
