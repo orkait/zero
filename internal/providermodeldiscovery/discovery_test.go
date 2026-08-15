@@ -12,6 +12,37 @@ import (
 	"github.com/Gitlawb/zero/internal/providercatalog"
 )
 
+func TestDiscoverClineUsesCuratedCatalogWithoutLiveProbe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("Cline discovery must not probe %s", r.URL.Path)
+	}))
+	t.Cleanup(server.Close)
+
+	models, err := Discover(context.Background(), config.ProviderProfile{
+		Name:         "cline",
+		CatalogID:    "cline",
+		ProviderKind: config.ProviderKindOpenAICompatible,
+		BaseURL:      server.URL + "/api/v1",
+		Model:        "cline-pass/glm-5.2",
+	}, Options{HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatalf("Discover() error = %v", err)
+	}
+	if len(models) == 0 {
+		t.Fatal("Discover() returned no Cline models")
+	}
+	foundDefault := false
+	for _, model := range models {
+		if model.ID == "cline-pass/glm-5.2" {
+			foundDefault = true
+			break
+		}
+	}
+	if !foundDefault {
+		t.Fatalf("Discover() missing cline-pass/glm-5.2; got %#v", modelIDs(models))
+	}
+}
+
 func TestDiscoverOpenAICompatibleModelsFetchesModelsEndpoint(t *testing.T) {
 	const apiKey = "sk-live-secret"
 	var gotPath string

@@ -182,6 +182,22 @@ zero providers add custom-openai-compatible \
   --set-active
 ```
 
+To use a Cline subscription, sign in with the Cline app or CLI first (Zero
+reads the WorkOS session from `~/.cline/data/settings/providers.json`; no API
+key). Then:
+
+```bash
+zero providers add cline --set-active
+```
+
+To use Hetzner Experiments Inference (OpenAI-compatible, currently free while experimental):
+
+```bash
+zero providers add hetzner --set-active
+```
+
+Set `HETZNER_API_KEY` or paste the token in the provider wizard. Default model is `Kimi-K2.7-Code`.
+
 For local models, run Ollama or LM Studio and then use `zero setup` or
 `zero providers detect`.
 

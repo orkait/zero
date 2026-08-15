@@ -169,6 +169,20 @@ var descriptors = []Descriptor{
 	// for your proxy's port. See docs/oauth-subscriptions.md.
 	localOpenAI("chatgpt-proxy", "ChatGPT (local OAuth proxy)", "http://localhost:10531/v1", "gpt-5", "chatgpt"),
 	func() Descriptor {
+		// Cline subscription: OpenAI-compatible gateway at api.cline.bot.
+		// Auth is the WorkOS session the Cline app stores in
+		// ~/.cline/data/settings/providers.json — not an API key and not Zero's
+		// in-app OAuth. RequiresAuth is true so remote-catalog invariants hold;
+		// UsesAmbientAuth plus empty AuthEnvVars skips the API-key wizard step.
+		d := openAICompat("cline", "Cline", "https://api.cline.bot/api/v1", "cline-pass/glm-5.2", nil, "cline-pass")
+		d.RequiresAuth = true
+		d.UsesAmbientAuth = true
+		return d
+	}(),
+	// Hetzner Experiments Inference API — OpenAI-compatible, currently free
+	// while experimental. Live /v1/models requires a Bearer token.
+	openAICompat("hetzner", "Hetzner Experiments", "https://inference.hetzner.com/api/v1", "Kimi-K2.7-Code", []string{"HETZNER_API_KEY"}, "hetzner-experiments", "hetzner-inference"),
+	func() Descriptor {
 		d := openAICompat("custom-openai-compatible", "Custom OpenAI-compatible", "https://example.invalid/v1", "custom-model", []string{"OPENAI_API_KEY"}, "custom openai compatible")
 		d.Custom = true
 		return d

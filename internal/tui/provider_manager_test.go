@@ -645,3 +645,20 @@ func TestProviderManagerCredStateFallsThroughStaleMarker(t *testing.T) {
 		t.Fatalf("expected stored key missing with no fallback, got %q", state)
 	}
 }
+
+func TestProviderManagerCredStateUsesClineAppSession(t *testing.T) {
+	t.Setenv("CLINE_CONFIG_PATH", filepath.Join(t.TempDir(), "missing.json"))
+	profile := config.ProviderProfile{Name: "cline", CatalogID: "cline", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://api.cline.bot/api/v1"}
+	if got := providerManagerCredState(profile, false, nil, map[string]bool{}); got != "no credential" {
+		t.Fatalf("missing Cline session = %q, want no credential", got)
+	}
+
+	session := filepath.Join(t.TempDir(), "providers.json")
+	if err := os.WriteFile(session, []byte(`{"lastUsedProvider":"cline-pass","providers":{"cline-pass":{"settings":{"auth":{"accessToken":"workos:access"}}}}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLINE_CONFIG_PATH", session)
+	if got := providerManagerCredState(profile, false, nil, map[string]bool{}); got != "cline session" {
+		t.Fatalf("present Cline session = %q, want cline session", got)
+	}
+}

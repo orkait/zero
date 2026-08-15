@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -64,5 +65,30 @@ func TestOAuthLoginForProfileReturnsNoResolverWithoutUsableLogin(t *testing.T) {
 				t.Fatalf("OAuthLoginForProfile() = (%v, %q), want (nil, empty)", resolver != nil, key)
 			}
 		})
+	}
+}
+
+func TestOAuthLoginForProfileUsesClineAmbientResolver(t *testing.T) {
+	t.Setenv("ZERO_OAUTH_STORAGE", "file")
+	t.Setenv("ZERO_OAUTH_TOKENS_PATH", filepath.Join(t.TempDir(), "oauth-tokens.json"))
+
+	token := "workos:cline-access"
+	path := filepath.Join(t.TempDir(), "providers.json")
+	payload := []byte(`{"lastUsedProvider":"cline-pass","providers":{"cline-pass":{"settings":{"auth":{"accessToken":"` + token + `"}}}}}` + "\n")
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLINE_CONFIG_PATH", path)
+
+	resolver, loginKey := OAuthLoginForProfile(config.ProviderProfile{Name: "cline", CatalogID: "cline"})
+	if resolver == nil {
+		t.Fatal("OAuthLoginForProfile() resolver = nil, want Cline ambient resolver")
+	}
+	if loginKey != "" {
+		t.Fatalf("loginKey = %q, want empty (Cline does not use Zero's OAuth store)", loginKey)
+	}
+	header, value, ok, err := resolver(context.Background(), false)
+	if err != nil || !ok || header != "Authorization" || value != "Bearer "+token {
+		t.Fatalf("Cline bearer = (%q, %q, %v, %v)", header, value, ok, err)
 	}
 }

@@ -26,6 +26,16 @@ func TestValidateProviderRuntimeReadyCustomEndpoint(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "cline ambient session does not require an API key",
+			profile: config.ProviderProfile{
+				Name:      "cline",
+				CatalogID: "cline",
+				BaseURL:   "https://api.cline.bot/api/v1",
+				Model:     "cline-pass/glm-5.2",
+			},
+			wantErr: false,
+		},
+		{
 			name: "custom openai compatible with stale legacy default env",
 			profile: config.ProviderProfile{
 				Name:      "local-llama",

@@ -12,6 +12,7 @@ import (
 	"github.com/Gitlawb/zero/internal/providercatalog"
 	"github.com/Gitlawb/zero/internal/providermodelcatalog"
 	"github.com/Gitlawb/zero/internal/providers/anthropic"
+	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/providers/gemini"
 	"github.com/Gitlawb/zero/internal/providers/openai"
 	"github.com/Gitlawb/zero/internal/providers/providerio"
@@ -222,6 +223,9 @@ func ResolveRuntimeMetadata(profile config.ProviderProfile, options Options) (Ru
 }
 
 func resolveProfile(profile config.ProviderProfile, options Options) (resolvedProfile, error) {
+	if cline.Matches(profile) {
+		profile.Model = cline.EnsureModelPrefix(profile.Model, cline.DefaultModelType)
+	}
 	model := strings.TrimSpace(profile.Model)
 	if model == "" {
 		return resolvedProfile{}, fmt.Errorf("provider %s requires model", profile.Name)

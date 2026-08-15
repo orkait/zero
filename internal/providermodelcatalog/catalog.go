@@ -5,6 +5,7 @@ import (
 
 	"github.com/Gitlawb/zero/internal/modelregistry"
 	"github.com/Gitlawb/zero/internal/providercatalog"
+	"github.com/Gitlawb/zero/internal/providers/cline"
 )
 
 type Model struct {
@@ -220,6 +221,34 @@ var curatedModels = map[string][]Model{
 		{ID: "qwen3.7-plus", Description: "Qwen 3.7 Plus: balanced model"},
 		{ID: "qwen3.7-max", Description: "Qwen 3.7 Max: strong model"},
 	},
+	"hetzner": {
+		{
+			ID:              "Kimi-K2.7-Code",
+			Description:     "catalog default",
+			ContextWindow:   262_144,
+			ToolCall:        true,
+			InputModalities: []string{"text", "image"},
+		},
+		{
+			ID:            "DeepSeek-V4-Flash-0731",
+			Description:   "DeepSeek V4 Flash",
+			ContextWindow: 512_000,
+			ToolCall:      true,
+		},
+		{
+			ID:            "GLM-5.2-NVFP4",
+			Description:   "GLM-5.2",
+			ContextWindow: 512_000,
+			ToolCall:      true,
+		},
+		{
+			ID:              "Qwen/Qwen3.6-35B-A3B-FP8",
+			Description:     "Qwen3.6 35B",
+			ContextWindow:   262_144,
+			ToolCall:        true,
+			InputModalities: []string{"text", "image"},
+		},
+	},
 	"custom-openai-compatible": {
 		{ID: "custom-model", Description: "custom endpoint model"},
 	},
@@ -229,6 +258,9 @@ var curatedModels = map[string][]Model{
 }
 
 func Models(provider providercatalog.Descriptor) []Model {
+	if providercatalog.NormalizeID(provider.ID) == cline.ID {
+		return FilterModelsForProvider(provider.ID, dedupeModels(provider.DefaultModel, modelsFromCline(cline.LoadCatalogModels())))
+	}
 	if models, ok := curatedModels[provider.ID]; ok {
 		return FilterModelsForProvider(provider.ID, dedupeModels(provider.DefaultModel, models))
 	}
@@ -237,6 +269,25 @@ func Models(provider providercatalog.Descriptor) []Model {
 		return FilterModelsForProvider(provider.ID, dedupeModels(provider.DefaultModel, models))
 	}
 	return FilterModelsForProvider(provider.ID, dedupeModels(provider.DefaultModel, nil))
+}
+
+func modelsFromCline(models []cline.CatalogModel) []Model {
+	result := make([]Model, 0, len(models))
+	for _, model := range models {
+		result = append(result, Model{
+			ID:               model.ID,
+			Description:      model.Description,
+			ContextWindow:    model.ContextWindow,
+			ToolCall:         model.ToolCall,
+			Reasoning:        model.Reasoning,
+			ReasoningEfforts: append([]string{}, model.ReasoningEfforts...),
+			InputModalities:  append([]string{}, model.InputModalities...),
+			InputCost:        model.InputCost,
+			OutputCost:       model.OutputCost,
+			Source:           model.Source,
+		})
+	}
+	return result
 }
 
 func registryModels(provider providercatalog.Descriptor) []Model {

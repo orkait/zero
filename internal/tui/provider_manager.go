@@ -172,6 +172,9 @@ func providerManagerCredState(profile config.ProviderProfile, local bool, store 
 	if local {
 		return "local"
 	}
+	if clineSessionAvailable(profile) {
+		return "cline session"
+	}
 	if profile.APIKeyStored {
 		return "stored key missing"
 	}

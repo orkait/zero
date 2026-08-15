@@ -10,6 +10,7 @@ import (
 
 	"github.com/Gitlawb/zero/internal/config"
 	"github.com/Gitlawb/zero/internal/providercatalog"
+	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/sandbox"
 	"github.com/Gitlawb/zero/internal/tools"
 	"github.com/Gitlawb/zero/internal/zerocommands"
@@ -430,6 +431,9 @@ func (m model) providerText() string {
 	if !snapshot.APIKeySet && snapshot.OAuthLogin {
 		credentialState = "oauth login"
 	}
+	if !snapshot.APIKeySet && !snapshot.OAuthLogin && clineSessionAvailable(m.providerProfile) {
+		credentialState = "cline session"
+	}
 	profileLines = append(profileLines,
 		"active: "+boolText(snapshot.Active),
 		"kind: "+displayValue(snapshot.ProviderKind, "unknown"),
@@ -443,7 +447,7 @@ func (m model) providerText() string {
 
 	status := commandStatusOK
 	actionLines := providerNextActionLines(m.providerProfile, snapshot, m.providerName)
-	if providerCredentialRequired(m.providerProfile, snapshot.ProviderKind) && !providerProfileHasCredential(m.providerProfile) && !snapshot.OAuthLogin {
+	if providerCredentialRequired(m.providerProfile, snapshot.ProviderKind) && !providerProfileHasCredential(m.providerProfile) && !snapshot.OAuthLogin && !clineSessionAvailable(m.providerProfile) {
 		status = commandStatusWarning
 	}
 	return renderCommandOutput(commandOutput{
@@ -461,7 +465,9 @@ func providerNextActionLines(profile config.ProviderProfile, snapshot zerocomman
 	setupID := providerSetupCatalogID(profile, snapshot.ProviderKind)
 	lines := []string{}
 	if providerCredentialRequired(profile, snapshot.ProviderKind) && !providerProfileHasCredential(profile) {
-		if envName := providerCredentialEnvName(profile, snapshot.ProviderKind); envName != "" {
+		if cline.Matches(profile) {
+			lines = append(lines, "sign in with the Cline app, then retry")
+		} else if envName := providerCredentialEnvName(profile, snapshot.ProviderKind); envName != "" {
 			lines = append(lines,
 				"set "+envName+" in your environment",
 				"zero providers add "+setupID+" --api-key-env "+envName+" --set-active",
@@ -478,7 +484,7 @@ func providerNextActionLines(profile config.ProviderProfile, snapshot zerocomman
 }
 
 func providerProfileHasCredential(profile config.ProviderProfile) bool {
-	return profile.HasConfiguredCredential()
+	return profile.HasConfiguredCredential() || clineSessionAvailable(profile)
 }
 
 func providerCredentialRequired(profile config.ProviderProfile, providerKind string) bool {
