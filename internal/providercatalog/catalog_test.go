@@ -46,6 +46,8 @@ var expectedCatalogIDs = []string{
 	"opencode-go-anthropic-compatible",
 	"atomic-chat",
 	"chatgpt-proxy",
+	"cline",
+	"hetzner",
 	"custom-openai-compatible",
 	"custom-anthropic-compatible",
 }
@@ -131,6 +133,77 @@ func TestAIMLAPIDescriptor(t *testing.T) {
 	}
 	if !reflect.DeepEqual(descriptor.AuthEnvVars, []string{"AIMLAPI_API_KEY"}) {
 		t.Fatalf("AuthEnvVars = %#v, want AIMLAPI_API_KEY", descriptor.AuthEnvVars)
+	}
+}
+
+func TestClineDescriptor(t *testing.T) {
+	descriptor, err := Require("cline")
+	if err != nil {
+		t.Fatalf("Require(cline) error = %v", err)
+	}
+	if descriptor.Name != "Cline" {
+		t.Fatalf("Name = %q, want Cline", descriptor.Name)
+	}
+	if descriptor.DefaultBaseURL != "https://api.cline.bot/api/v1" {
+		t.Fatalf("DefaultBaseURL = %q, want Cline gateway", descriptor.DefaultBaseURL)
+	}
+	if descriptor.DefaultModel != "cline-pass/glm-5.2" {
+		t.Fatalf("DefaultModel = %q, want cline-pass/glm-5.2", descriptor.DefaultModel)
+	}
+	if descriptor.Transport != TransportOpenAICompatible {
+		t.Fatalf("Transport = %q, want %q", descriptor.Transport, TransportOpenAICompatible)
+	}
+	if descriptor.RequiresAuth != true {
+		t.Fatal("Cline should require auth (ambient Cline app session)")
+	}
+	if !descriptor.UsesAmbientAuth {
+		t.Fatal("Cline should use ambient Cline app credentials")
+	}
+	if len(descriptor.AuthEnvVars) != 0 {
+		t.Fatalf("AuthEnvVars = %#v, want empty (no API key)", descriptor.AuthEnvVars)
+	}
+	if descriptor.OAuth {
+		t.Fatal("Cline must not use Zero's in-app OAuth; the Cline app owns login")
+	}
+	if descriptor.Local || descriptor.Custom {
+		t.Fatal("Cline is a remote subscription gateway, not a local or custom endpoint")
+	}
+	if alias, ok := Get("cline-pass"); !ok || alias.ID != "cline" {
+		t.Fatalf("alias cline-pass = %+v", alias)
+	}
+}
+
+func TestHetznerDescriptor(t *testing.T) {
+	descriptor, err := Require("hetzner")
+	if err != nil {
+		t.Fatalf("Require(hetzner) error = %v", err)
+	}
+	if descriptor.Name != "Hetzner Experiments" {
+		t.Fatalf("Name = %q, want Hetzner Experiments", descriptor.Name)
+	}
+	if descriptor.DefaultBaseURL != "https://inference.hetzner.com/api/v1" {
+		t.Fatalf("DefaultBaseURL = %q, want Hetzner Inference API", descriptor.DefaultBaseURL)
+	}
+	if descriptor.DefaultModel != "Kimi-K2.7-Code" {
+		t.Fatalf("DefaultModel = %q, want Kimi-K2.7-Code", descriptor.DefaultModel)
+	}
+	if descriptor.Transport != TransportOpenAICompatible {
+		t.Fatalf("Transport = %q, want %q", descriptor.Transport, TransportOpenAICompatible)
+	}
+	if !reflect.DeepEqual(descriptor.AuthEnvVars, []string{"HETZNER_API_KEY"}) {
+		t.Fatalf("AuthEnvVars = %#v, want HETZNER_API_KEY", descriptor.AuthEnvVars)
+	}
+	if !descriptor.RequiresAuth {
+		t.Fatal("Hetzner Inference API requires a Bearer token")
+	}
+	if descriptor.OAuth || descriptor.Local || descriptor.Custom || descriptor.UsesAmbientAuth {
+		t.Fatal("Hetzner is a remote OpenAI-compatible API-key provider")
+	}
+	if alias, ok := Get("hetzner-experiments"); !ok || alias.ID != "hetzner" {
+		t.Fatalf("alias hetzner-experiments = %+v", alias)
+	}
+	if alias, ok := Get("hetzner-inference"); !ok || alias.ID != "hetzner" {
+		t.Fatalf("alias hetzner-inference = %+v", alias)
 	}
 }
 
@@ -324,6 +397,8 @@ func TestLookupNormalizesIDsAndAliases(t *testing.T) {
 		"custom_openai_compatible":     "custom-openai-compatible",
 		"custom--anthropic compatible": "custom-anthropic-compatible",
 		"GitLawb OpenGateway":          "gitlawb-opengateway",
+		"Hetzner Experiments":          "hetzner",
+		"hetzner-inference":            "hetzner",
 	}
 	for input, want := range cases {
 		descriptor, ok := Get(input)
@@ -369,7 +444,7 @@ func TestListByTransportPreservesCatalogOrder(t *testing.T) {
 		TransportBedrock:         {"bedrock"},
 		TransportVertex:          {"vertex"},
 		TransportAnthropicCompat: {"minimax", "minimaxi-cn", "opencode-go-anthropic-compatible", "custom-anthropic-compatible"},
-		TransportOpenAICompat:    {"gitlawb-opengateway", "aimlapi", "ollama-cloud", "ollama", "lmstudio", "openrouter", "huggingface", "chatgpt", "groq", "deepseek", "together", "fireworks", "dashscope", "moonshot", "atlascloud", "longcat", "nvidia-nim", "mistral", "github", "xai", "venice", "xiaomi-mimo", "bankr", "zai", "zai-cn", "kilocode", "opencode", "opencode-go", "atomic-chat", "chatgpt-proxy", "custom-openai-compatible"},
+		TransportOpenAICompat:    {"gitlawb-opengateway", "aimlapi", "ollama-cloud", "ollama", "lmstudio", "openrouter", "huggingface", "chatgpt", "groq", "deepseek", "together", "fireworks", "dashscope", "moonshot", "atlascloud", "longcat", "nvidia-nim", "mistral", "github", "xai", "venice", "xiaomi-mimo", "bankr", "zai", "zai-cn", "kilocode", "opencode", "opencode-go", "atomic-chat", "chatgpt-proxy", "cline", "hetzner", "custom-openai-compatible"},
 	}
 
 	for transport, wantIDs := range cases {

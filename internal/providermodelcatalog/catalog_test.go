@@ -77,6 +77,16 @@ func TestModelsAreProviderScoped(t *testing.T) {
 			want:     []string{"minimax-m3", "minimax-m2.7", "qwen3.7-plus", "qwen3.7-max"},
 			notWant:  []string{"gpt-4.1", "claude-sonnet-4.5", "deepseek-chat"},
 		},
+		{
+			provider: "cline",
+			want:     []string{"cline-pass/glm-5.2", "cline-pass/deepseek-v4-pro", "cline-pass/minimax-m3"},
+			notWant:  []string{"gpt-4.1", "claude-sonnet-4.5"},
+		},
+		{
+			provider: "hetzner",
+			want:     []string{"Kimi-K2.7-Code", "DeepSeek-V4-Flash-0731", "GLM-5.2-NVFP4", "Qwen/Qwen3.6-35B-A3B-FP8"},
+			notWant:  []string{"gpt-4.1", "claude-sonnet-4.5"},
+		},
 	}
 
 	for _, tt := range tests {

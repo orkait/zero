@@ -14,6 +14,7 @@ import (
 	"github.com/Gitlawb/zero/internal/config"
 	"github.com/Gitlawb/zero/internal/providercatalog"
 	"github.com/Gitlawb/zero/internal/providermodelcatalog"
+	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/providers/openai"
 	"github.com/Gitlawb/zero/internal/providers/providerio"
 	"github.com/Gitlawb/zero/internal/redaction"
@@ -54,6 +55,9 @@ type Options struct {
 }
 
 func DiscoverCatalog(ctx context.Context, provider providercatalog.Descriptor, profile config.ProviderProfile, options Options) ([]Model, error) {
+	if cline.Matches(profile) || providercatalog.NormalizeID(provider.ID) == cline.ID {
+		return clineCatalogModels(provider), nil
+	}
 	catalogModels, catalogErr := fetchCatalogModels(ctx, provider, options)
 	// OpenRouter and OpenGateway publish public live model lists. Probe them even
 	// without credentials so the picker stays current before a key is entered.
@@ -98,6 +102,13 @@ func discoveryHasCredential(profile config.ProviderProfile) bool {
 }
 
 func Discover(ctx context.Context, profile config.ProviderProfile, options Options) ([]Model, error) {
+	if cline.Matches(profile) {
+		descriptor, ok := providercatalog.Get(cline.ID)
+		if !ok {
+			return nil, fmt.Errorf("cline catalog descriptor is missing")
+		}
+		return clineCatalogModels(descriptor), nil
+	}
 	switch discoveryProviderKind(profile) {
 	case config.ProviderKindOpenAI, config.ProviderKindOpenAICompatible:
 		return discoverOpenAIModels(ctx, profile, options)
@@ -505,6 +516,15 @@ func fetchCatalogModels(ctx context.Context, provider providercatalog.Descriptor
 		return nil, err
 	}
 	return modelsFromCatalog(models), nil
+}
+
+func clineCatalogModels(provider providercatalog.Descriptor) []Model {
+	if providercatalog.NormalizeID(provider.ID) != cline.ID {
+		if descriptor, ok := providercatalog.Get(cline.ID); ok {
+			provider = descriptor
+		}
+	}
+	return modelsFromCatalog(providermodelcatalog.Models(provider))
 }
 
 func modelsFromCatalog(models []providermodelcatalog.Model) []Model {

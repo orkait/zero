@@ -253,6 +253,11 @@ func TestProviderProfileMissingCredentialEnv(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "cline uses ambient Cline app session, not an API key env",
+			profile: ProviderProfile{Name: "cline", CatalogID: "cline"},
+			want:    false,
+		},
+		{
 			name:    "local catalog provider",
 			profile: ProviderProfile{Name: "local", CatalogID: "ollama"},
 			want:    false,

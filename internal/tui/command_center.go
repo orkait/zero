@@ -17,6 +17,7 @@ import (
 	"github.com/Gitlawb/zero/internal/oauth"
 	"github.com/Gitlawb/zero/internal/providermodelcatalog"
 	"github.com/Gitlawb/zero/internal/providers"
+	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/redaction"
 	zsearch "github.com/Gitlawb/zero/internal/search"
 )
@@ -546,11 +547,11 @@ func (m model) switchProviderModel(providerName, modelID string) (model, string,
 	// Gate on the resolved credential, not the APIKeyStored marker: if the stored key
 	// was deleted/unreadable the marker can still be set, and building a keyless
 	// provider would only fail later with a 401. Local/no-auth providers need no key,
-	// and a stored OAuth login (e.g. ChatGPT) is a credential too — the profile stays
-	// keyless on purpose so newProvider attaches the bearer resolver + login key.
+	// a stored OAuth login (e.g. ChatGPT) is a credential too, and Cline uses the
+	// Cline app's WorkOS session rather than a Zero-stored key or `zero auth login`.
 	if strings.TrimSpace(target.APIKey) == "" && strings.TrimSpace(target.AuthHeaderValue) == "" &&
-		(!hasDescriptor || !descriptor.Local) && !oauthLoginAvailable(target) {
-		return m, "Model\nprovider " + strconv.Quote(providerName) + " has no usable credential — run setup or `zero auth login " + providerName + "`.", false, nil
+		(!hasDescriptor || !descriptor.Local) && !oauthLoginAvailable(target) && !clineSessionAvailable(target) {
+		return m, "Model\n" + providerSwitchCredentialMissingText(target), false, nil
 	}
 	next, err := m.newProvider(target)
 	if err != nil {
@@ -671,6 +672,18 @@ func oauthLoginName(profile config.ProviderProfile) (string, bool) {
 		return "", false
 	}
 	return strings.TrimPrefix(key, oauth.KeyPrefixProvider), true
+}
+
+func clineSessionAvailable(profile config.ProviderProfile) bool {
+	return cline.Matches(profile) && cline.HasSession(cline.Options{})
+}
+
+func providerSwitchCredentialMissingText(profile config.ProviderProfile) string {
+	name := strings.TrimSpace(profile.Name)
+	if cline.Matches(profile) {
+		return "provider " + strconv.Quote(name) + " has no Cline app session - sign in with the Cline app, then retry."
+	}
+	return "provider " + strconv.Quote(name) + " has no usable credential - run setup or `zero auth login " + name + "`."
 }
 
 func (m model) savedProviderByName(name string) (config.ProviderProfile, bool) {

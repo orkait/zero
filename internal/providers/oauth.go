@@ -8,6 +8,7 @@ import (
 
 	"github.com/Gitlawb/zero/internal/config"
 	"github.com/Gitlawb/zero/internal/oauth"
+	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/providers/providerio"
 )
 
@@ -16,6 +17,9 @@ import (
 // alongside the resolver lets auxiliary requests derive account-scoped headers
 // from the same login that supplies the bearer.
 func OAuthLoginForProfile(profile config.ProviderProfile) (providerio.TokenResolver, string) {
+	if cline.Matches(profile) {
+		return cline.Resolver(cline.Options{}), ""
+	}
 	candidates := profile.OAuthLoginCandidates()
 	if len(candidates) == 0 {
 		return nil, ""

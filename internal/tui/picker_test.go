@@ -1453,3 +1453,65 @@ func TestSwitchProviderModelStillRejectsProviderWithNoCredential(t *testing.T) {
 		t.Fatalf("expected the credential gate to refuse, got %q (ok=%v)", text, ok)
 	}
 }
+
+func TestSwitchProviderModelUsesClineAppSession(t *testing.T) {
+	session := filepath.Join(t.TempDir(), "providers.json")
+	if err := os.WriteFile(session, []byte(`{"lastUsedProvider":"cline-pass","providers":{"cline-pass":{"settings":{"auth":{"accessToken":"workos:access","refreshToken":"refresh"}}}}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLINE_CONFIG_PATH", session)
+
+	var built config.ProviderProfile
+	m := newModel(context.Background(), Options{
+		ProviderName:    "opengateway",
+		ModelName:       "some-model",
+		Provider:        &fakeProvider{},
+		ProviderProfile: config.ProviderProfile{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+		SavedProviders: []config.ProviderProfile{
+			{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+			{Name: "cline", CatalogID: "cline", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://api.cline.bot/api/v1", Model: "cline-pass/glm-5.2"},
+		},
+		NewProvider: func(profile config.ProviderProfile) (zeroruntime.Provider, error) {
+			built = profile
+			return &fakeProvider{}, nil
+		},
+	})
+
+	next, text, ok, _ := m.switchProviderModel("cline", "cline-pass/glm-5.2")
+	if !ok || !strings.Contains(text, "Switched to cline") {
+		t.Fatalf("switch should succeed on the Cline app session, got %q (ok=%v)", text, ok)
+	}
+	if next.providerName != "cline" {
+		t.Fatalf("providerName = %q, want cline", next.providerName)
+	}
+	if built.APIKey != "" {
+		t.Fatalf("Cline session must not be inlined as APIKey, got %q", built.APIKey)
+	}
+}
+
+func TestSwitchProviderModelRejectsClineWithoutAppSession(t *testing.T) {
+	t.Setenv("CLINE_CONFIG_PATH", filepath.Join(t.TempDir(), "missing.json"))
+
+	m := newModel(context.Background(), Options{
+		ProviderName:    "opengateway",
+		ModelName:       "some-model",
+		Provider:        &fakeProvider{},
+		ProviderProfile: config.ProviderProfile{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+		SavedProviders: []config.ProviderProfile{
+			{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+			{Name: "cline", CatalogID: "cline", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://api.cline.bot/api/v1", Model: "cline-pass/glm-5.2"},
+		},
+		NewProvider: func(config.ProviderProfile) (zeroruntime.Provider, error) {
+			t.Fatal("newProvider must not run without a Cline session")
+			return nil, nil
+		},
+	})
+
+	_, text, ok, _ := m.switchProviderModel("cline", "cline-pass/glm-5.2")
+	if ok || !strings.Contains(text, "Cline app") {
+		t.Fatalf("expected a Cline-app session hint, got %q (ok=%v)", text, ok)
+	}
+	if strings.Contains(text, "zero auth login") {
+		t.Fatalf("must not send Cline users to zero auth login, got %q", text)
+	}
+}

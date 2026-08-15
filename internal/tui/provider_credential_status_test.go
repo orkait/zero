@@ -51,6 +51,14 @@ func TestProviderCredentialRequiredCustomEndpoint(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "cline still requires a Cline app session, not a Zero API key",
+			profile: config.ProviderProfile{
+				Name:      "cline",
+				CatalogID: "cline",
+			},
+			want: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
