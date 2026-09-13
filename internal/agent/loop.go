@@ -13,6 +13,7 @@ import (
 
 	"github.com/Gitlawb/zero/internal/execution"
 	"github.com/Gitlawb/zero/internal/hooks"
+	"github.com/Gitlawb/zero/internal/providers/opencode"
 	"github.com/Gitlawb/zero/internal/redaction"
 	"github.com/Gitlawb/zero/internal/sandbox"
 	"github.com/Gitlawb/zero/internal/streamjson"
@@ -124,6 +125,12 @@ func Run(ctx context.Context, prompt string, provider Provider, options Options)
 	if provider == nil {
 		return Result{}, errors.New("agent provider is required")
 	}
+
+	// OpenCode Go routes per conversation and rejects calls without its session
+	// header. Bind it here, the one seam every front end (exec, TUI, ACP) passes
+	// the run's session id through, so a resumed session keeps the routing id it
+	// had in the previous process. A no-op for every other provider.
+	opencode.BindSession(options.SessionID)
 
 	// Tracing is opt-in. When a recorder is wired, thread it into ctx so the
 	// providerio seam and reconnect helper can reach it via trace.FromContext,

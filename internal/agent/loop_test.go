@@ -15,6 +15,7 @@ import (
 
 	"github.com/Gitlawb/zero/internal/execution"
 	"github.com/Gitlawb/zero/internal/hooks"
+	"github.com/Gitlawb/zero/internal/providers/opencode"
 	"github.com/Gitlawb/zero/internal/sandbox"
 	"github.com/Gitlawb/zero/internal/specmode"
 	"github.com/Gitlawb/zero/internal/tools"
@@ -4433,5 +4434,48 @@ func TestCancellingASandboxRetryAbortsWithoutRetrying(t *testing.T) {
 				t.Fatalf("the escalated retry ran %d times after a cancel: %+v", len(retryTool.calls), retryTool.calls)
 			}
 		})
+	}
+}
+
+func TestRunBindsOpenCodeGoRoutingSession(t *testing.T) {
+	provider := &mockProvider{turns: [][]zeroruntime.StreamEvent{{
+		{Type: zeroruntime.StreamEventText, Content: "done"},
+		{Type: zeroruntime.StreamEventDone},
+	}}}
+
+	if _, err := Run(context.Background(), "hi", provider, Options{
+		SessionID:    "session-routing-1",
+		Cwd:          t.TempDir(),
+		ProviderName: "test-provider",
+		Model:        "test-model",
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	first := opencode.SessionID()
+
+	if _, err := Run(context.Background(), "hi", provider, Options{
+		SessionID:    "session-routing-1",
+		Cwd:          t.TempDir(),
+		ProviderName: "test-provider",
+		Model:        "test-model",
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	// Same Zero session, new run: OpenCode Go must see the same routing id or
+	// every resume lands on a cold gateway route.
+	if again := opencode.SessionID(); again != first {
+		t.Fatalf("routing id = %q, want %q for the same session", again, first)
+	}
+
+	if _, err := Run(context.Background(), "hi", provider, Options{
+		SessionID:    "session-routing-2",
+		Cwd:          t.TempDir(),
+		ProviderName: "test-provider",
+		Model:        "test-model",
+	}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if other := opencode.SessionID(); other == first {
+		t.Fatalf("routing id = %q, want a distinct id for a different session", other)
 	}
 }
