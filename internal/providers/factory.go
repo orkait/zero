@@ -15,6 +15,7 @@ import (
 	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/providers/gemini"
 	"github.com/Gitlawb/zero/internal/providers/openai"
+	"github.com/Gitlawb/zero/internal/providers/opencode"
 	"github.com/Gitlawb/zero/internal/providers/providerio"
 	"github.com/Gitlawb/zero/internal/zeroruntime"
 )
@@ -54,6 +55,14 @@ func New(profile config.ProviderProfile, options Options) (zeroruntime.Provider,
 		return newCodexProvider(profile, resolved, options)
 	}
 
+	// OpenCode Go rejects any model call without a routing session header
+	// (400 MissingSessionID) on both its OpenAI- and Anthropic-compatible
+	// endpoints, so stamp this process's id on requests to it.
+	customHeaders := providerio.CopyHeaders(profile.CustomHeaders)
+	if opencode.Matches(profile) {
+		customHeaders = opencode.WithSessionHeader(customHeaders)
+	}
+
 	switch resolved.providerKind {
 	case config.ProviderKindOpenAI, config.ProviderKindOpenAICompatible:
 		// prompt_cache_key is an OpenAI-only chat-completions field. Strict
@@ -68,7 +77,7 @@ func New(profile config.ProviderProfile, options Options) (zeroruntime.Provider,
 			AuthHeader:            profile.AuthHeader,
 			AuthScheme:            profile.AuthScheme,
 			AuthHeaderValue:       profile.AuthHeaderValue,
-			CustomHeaders:         providerio.CopyHeaders(profile.CustomHeaders),
+			CustomHeaders:         customHeaders,
 			OAuthResolver:         options.OAuthResolver,
 			MaxTokens:             resolved.maxOutputTokens,
 			HTTPClient:            options.HTTPClient,
@@ -84,7 +93,7 @@ func New(profile config.ProviderProfile, options Options) (zeroruntime.Provider,
 			AuthHeader:      profile.AuthHeader,
 			AuthScheme:      profile.AuthScheme,
 			AuthHeaderValue: profile.AuthHeaderValue,
-			CustomHeaders:   providerio.CopyHeaders(profile.CustomHeaders),
+			CustomHeaders:   customHeaders,
 			OAuthResolver:   options.OAuthResolver,
 			MaxTokens:       resolved.maxOutputTokens,
 			HTTPClient:      options.HTTPClient,
@@ -98,7 +107,7 @@ func New(profile config.ProviderProfile, options Options) (zeroruntime.Provider,
 			AuthHeader:      profile.AuthHeader,
 			AuthScheme:      profile.AuthScheme,
 			AuthHeaderValue: profile.AuthHeaderValue,
-			CustomHeaders:   providerio.CopyHeaders(profile.CustomHeaders),
+			CustomHeaders:   customHeaders,
 			OAuthResolver:   options.OAuthResolver,
 			MaxTokens:       resolved.maxOutputTokens,
 			HTTPClient:      options.HTTPClient,

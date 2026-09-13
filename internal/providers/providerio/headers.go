@@ -3,7 +3,33 @@ package providerio
 import (
 	"net/http"
 	"strings"
+	"sync"
 )
+
+// headerValueResolvers holds the providers that compute a custom header's value
+// per request instead of at client construction. A provider registers one when
+// its header depends on state that is only known after the client exists (the
+// OpenCode Go routing session id is bound once the run's Zero session starts).
+var headerValueResolvers sync.Map // canonical header name -> func() string
+
+// RegisterHeaderValueResolver makes resolve the source for the named custom
+// header whenever a request carries it with an empty value. Registration is
+// process-wide, so it belongs in a provider package's init.
+func RegisterHeaderValueResolver(name string, resolve func() string) {
+	name = strings.TrimSpace(name)
+	if name == "" || resolve == nil {
+		return
+	}
+	headerValueResolvers.Store(http.CanonicalHeaderKey(name), resolve)
+}
+
+func resolveHeaderValue(name string) string {
+	resolve, ok := headerValueResolvers.Load(http.CanonicalHeaderKey(name))
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(resolve.(func() string)())
+}
 
 type AuthHeaders struct {
 	APIKey            string
@@ -21,7 +47,16 @@ func ApplyAuthHeaders(request *http.Request, options AuthHeaders) {
 		if key == "" {
 			continue
 		}
-		request.Header.Set(key, strings.TrimSpace(value))
+		value = strings.TrimSpace(value)
+		if value == "" {
+			// An empty configured value carries no information: prefer the
+			// registered resolver, and send nothing when there is none rather
+			// than an empty header the gateway would have to interpret.
+			if value = resolveHeaderValue(key); value == "" {
+				continue
+			}
+		}
+		request.Header.Set(key, value)
 	}
 
 	header := strings.TrimSpace(options.AuthHeader)

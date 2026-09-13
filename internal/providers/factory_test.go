@@ -10,6 +10,7 @@ import (
 
 	"github.com/Gitlawb/zero/internal/config"
 	"github.com/Gitlawb/zero/internal/oauth"
+	"github.com/Gitlawb/zero/internal/providers/opencode"
 	"github.com/Gitlawb/zero/internal/zeroruntime"
 )
 
@@ -830,5 +831,67 @@ func TestResolveRuntimeMetadataRejectsModelOutsideProviderAllowlist(t *testing.T
 	}
 	if !strings.Contains(err.Error(), "claude-sonnet-4.5") {
 		t.Fatalf("error = %q, want it to name the rejected model", err.Error())
+	}
+}
+
+func TestNewOpenCodeGoProviderSendsSessionHeader(t *testing.T) {
+	transport := &captureTransport{responseBody: "data: [DONE]\n\n"}
+	provider, err := New(config.ProviderProfile{
+		Name:         "opencode-go",
+		CatalogID:    "opencode-go",
+		ProviderKind: config.ProviderKindOpenAICompatible,
+		APIKey:       "sk-opencode",
+		Model:        "deepseek-v4-pro",
+	}, Options{HTTPClient: &http.Client{Transport: transport}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	stream, err := provider.StreamCompletion(context.Background(), zeroruntime.CompletionRequest{
+		Messages: []zeroruntime.Message{{Role: zeroruntime.MessageRoleUser, Content: "hello"}},
+	})
+	if err != nil {
+		t.Fatalf("StreamCompletion() error = %v", err)
+	}
+	for range stream {
+	}
+
+	if transport.request == nil {
+		t.Fatal("HTTP client was not used")
+	}
+	// The gateway answers 400 MissingSessionID without this header, so its
+	// absence is a broken provider, not a cosmetic gap.
+	if got := transport.request.Header.Get(opencode.SessionHeaderName); got == "" {
+		t.Fatalf("%s = %q, want a generated session id", opencode.SessionHeaderName, got)
+	}
+}
+
+func TestNewOpenCodeGoProviderKeepsConfiguredSessionHeader(t *testing.T) {
+	transport := &captureTransport{responseBody: "data: [DONE]\n\n"}
+	provider, err := New(config.ProviderProfile{
+		Name:          "opencode-go",
+		CatalogID:     "opencode-go-anthropic-compatible",
+		ProviderKind:  config.ProviderKindAnthropicCompat,
+		BaseURL:       "https://opencode.ai/zen/go",
+		APIKey:        "sk-opencode",
+		Model:         "minimax-m3",
+		CustomHeaders: map[string]string{opencode.SessionHeaderName: "ses_configured"},
+	}, Options{HTTPClient: &http.Client{Transport: transport}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	stream, err := provider.StreamCompletion(context.Background(), zeroruntime.CompletionRequest{
+		Messages: []zeroruntime.Message{{Role: zeroruntime.MessageRoleUser, Content: "hello"}},
+	})
+	if err != nil {
+		t.Fatalf("StreamCompletion() error = %v", err)
+	}
+	for range stream {
+	}
+
+	if transport.request == nil {
+		t.Fatal("HTTP client was not used")
+	}
+	if got := transport.request.Header.Get(opencode.SessionHeaderName); got != "ses_configured" {
+		t.Fatalf("%s = %q, want the configured session id", opencode.SessionHeaderName, got)
 	}
 }
