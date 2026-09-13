@@ -662,3 +662,21 @@ func TestProviderManagerCredStateUsesClineAppSession(t *testing.T) {
 		t.Fatalf("present Cline session = %q, want cline session", got)
 	}
 }
+
+func TestProviderManagerCredStateUsesOpenCodeAuthJSON(t *testing.T) {
+	t.Setenv("OPENCODE_API_KEY", "")
+	t.Setenv("OPENCODE_AUTH_PATH", filepath.Join(t.TempDir(), "missing.json"))
+	profile := config.ProviderProfile{Name: "opencode-go", CatalogID: "opencode-go", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://opencode.ai/zen/go/v1"}
+	if got := providerManagerCredState(profile, false, nil, map[string]bool{}); got != "no credential" {
+		t.Fatalf("missing OpenCode key = %q, want no credential", got)
+	}
+
+	auth := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(auth, []byte(`{"opencode-go":{"type":"api","key":"sk-opencode-go-test"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OPENCODE_AUTH_PATH", auth)
+	if got := providerManagerCredState(profile, false, nil, map[string]bool{}); got != "opencode auth.json" {
+		t.Fatalf("present OpenCode key = %q, want opencode auth.json", got)
+	}
+}

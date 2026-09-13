@@ -203,9 +203,10 @@ func (profile ProviderProfile) MissingCredentialEnv() (string, bool) {
 			}
 			return envVar, true
 		}
-		// Ambient-auth providers (Cline's WorkOS session, AWS instance role)
-		// with no catalog env var do not expect an API key. An explicit
-		// APIKeyEnv on the profile still means the operator asked for one.
+		// Ambient-auth providers (Cline's WorkOS session, OpenCode Go's
+		// auth.json key, AWS instance role) with no catalog env var do not
+		// expect an API key. An explicit APIKeyEnv on the profile still means
+		// the operator asked for one.
 		if descriptor.UsesAmbientAuth && len(descriptor.AuthEnvVars) == 0 && strings.TrimSpace(profile.APIKeyEnv) == "" {
 			return "", false
 		}

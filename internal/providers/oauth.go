@@ -9,6 +9,7 @@ import (
 	"github.com/Gitlawb/zero/internal/config"
 	"github.com/Gitlawb/zero/internal/oauth"
 	"github.com/Gitlawb/zero/internal/providers/cline"
+	"github.com/Gitlawb/zero/internal/providers/opencode"
 	"github.com/Gitlawb/zero/internal/providers/providerio"
 )
 
@@ -19,6 +20,9 @@ import (
 func OAuthLoginForProfile(profile config.ProviderProfile) (providerio.TokenResolver, string) {
 	if cline.Matches(profile) {
 		return cline.Resolver(cline.Options{}), ""
+	}
+	if opencode.Matches(profile) && !profile.HasConfiguredCredential() {
+		return opencode.Resolver(opencode.Options{APIKeyHeader: opencode.UsesAPIKeyHeader(profile)}), ""
 	}
 	candidates := profile.OAuthLoginCandidates()
 	if len(candidates) == 0 {

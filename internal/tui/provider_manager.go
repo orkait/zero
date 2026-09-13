@@ -175,6 +175,9 @@ func providerManagerCredState(profile config.ProviderProfile, local bool, store 
 	if clineSessionAvailable(profile) {
 		return "cline session"
 	}
+	if opencodeGoKeyAvailable(profile) {
+		return "opencode auth.json"
+	}
 	if profile.APIKeyStored {
 		return "stored key missing"
 	}

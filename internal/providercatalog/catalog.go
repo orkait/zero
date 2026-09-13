@@ -158,7 +158,18 @@ var descriptors = []Descriptor{
 	openAICompat("zai-cn", "Z.ai CN", "https://open.bigmodel.cn/api/paas/v4", "glm-4.5", []string{"ZHIPU_API_KEY"}, "z.ai cn"),
 	openAICompat("kilocode", "KiloCode", "https://api.kilo.ai/api/gateway", "anthropic/claude-sonnet-4.6", []string{"KILO_API_KEY"}, "kilo", "kilo gateway"),
 	openAICompat("opencode", "OpenCode Zen", "https://opencode.ai/zen/v1", "deepseek-v4-flash", []string{"OPENCODE_API_KEY"}, "opencode zen"),
-	openAICompat("opencode-go", "OpenCode Go", "https://opencode.ai/zen/go/v1", "deepseek-v4-pro", []string{"OPENCODE_API_KEY"}, "opencode go"),
+	func() Descriptor {
+		// OpenCode Go subscription: OpenAI-compatible gateway at opencode.ai/zen/go.
+		// Auth is the static API key OpenCode stores in
+		// ~/.local/share/opencode/auth.json — not Zero's in-app OAuth.
+		// OPENCODE_API_KEY still overrides when set. RequiresAuth is true so
+		// remote-catalog invariants hold; UsesAmbientAuth plus empty AuthEnvVars
+		// skips the API-key wizard step.
+		d := openAICompat("opencode-go", "OpenCode Go", "https://opencode.ai/zen/go/v1", "deepseek-v4-pro", nil, "opencode go")
+		d.RequiresAuth = true
+		d.UsesAmbientAuth = true
+		return d
+	}(),
 	anthropicCompat("opencode-go-anthropic-compatible", "OpenCode Go Anthropic-compatible", "https://opencode.ai/zen/go", "minimax-m3", []string{"OPENCODE_API_KEY"}),
 	openAICompat("atomic-chat", "Atomic Chat", "https://api.atomic.chat/v1", "gpt-4.1", []string{"ATOMIC_CHAT_API_KEY"}),
 	// ChatGPT subscription via a local OAuth proxy. A ChatGPT (Plus/Pro) OAuth

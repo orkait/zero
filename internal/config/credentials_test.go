@@ -258,6 +258,11 @@ func TestProviderProfileMissingCredentialEnv(t *testing.T) {
 			want:    false,
 		},
 		{
+			name:    "opencode-go uses ambient OpenCode auth.json, not an API key env",
+			profile: ProviderProfile{Name: "opencode-go", CatalogID: "opencode-go"},
+			want:    false,
+		},
+		{
 			name:    "local catalog provider",
 			profile: ProviderProfile{Name: "local", CatalogID: "ollama"},
 			want:    false,

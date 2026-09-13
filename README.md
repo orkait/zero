@@ -190,6 +190,17 @@ key). Then:
 zero providers add cline --set-active
 ```
 
+To use OpenCode Go, sign in with OpenCode first (Zero reads the `opencode-go`
+API key from `~/.local/share/opencode/auth.json`, or `OPENCODE_API_KEY` when
+set). Then:
+
+```bash
+zero providers add opencode-go --set-active
+```
+
+Default model is `deepseek-v4-pro`. `/model` lists the live OpenCode Go catalog
+when the key is present.
+
 To use Hetzner Experiments Inference (OpenAI-compatible, currently free while experimental):
 
 ```bash

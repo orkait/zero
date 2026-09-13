@@ -92,3 +92,48 @@ func TestOAuthLoginForProfileUsesClineAmbientResolver(t *testing.T) {
 		t.Fatalf("Cline bearer = (%q, %q, %v, %v)", header, value, ok, err)
 	}
 }
+
+func TestOAuthLoginForProfileUsesOpenCodeGoAmbientResolver(t *testing.T) {
+	t.Setenv("ZERO_OAUTH_STORAGE", "file")
+	t.Setenv("ZERO_OAUTH_TOKENS_PATH", filepath.Join(t.TempDir(), "oauth-tokens.json"))
+	t.Setenv("OPENCODE_API_KEY", "")
+
+	path := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(path, []byte(`{"opencode-go":{"type":"api","key":"sk-opencode-go-test"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OPENCODE_AUTH_PATH", path)
+
+	resolver, loginKey := OAuthLoginForProfile(config.ProviderProfile{Name: "opencode-go", CatalogID: "opencode-go"})
+	if resolver == nil {
+		t.Fatal("OAuthLoginForProfile() resolver = nil, want OpenCode Go ambient resolver")
+	}
+	if loginKey != "" {
+		t.Fatalf("loginKey = %q, want empty (OpenCode Go does not use Zero's OAuth store)", loginKey)
+	}
+	header, value, ok, err := resolver(context.Background(), false)
+	if err != nil || !ok || header != "Authorization" || value != "Bearer sk-opencode-go-test" {
+		t.Fatalf("OpenCode Go bearer = (%q, %q, %v, %v)", header, value, ok, err)
+	}
+}
+
+func TestOAuthLoginForProfileDoesNotOverrideOpenCodeGoStoredKey(t *testing.T) {
+	t.Setenv("ZERO_OAUTH_STORAGE", "file")
+	t.Setenv("ZERO_OAUTH_TOKENS_PATH", filepath.Join(t.TempDir(), "oauth-tokens.json"))
+	t.Setenv("OPENCODE_API_KEY", "")
+
+	path := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(path, []byte(`{"opencode-go":{"type":"api","key":"sk-from-file"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OPENCODE_AUTH_PATH", path)
+
+	resolver, loginKey := OAuthLoginForProfile(config.ProviderProfile{
+		Name:      "opencode-go",
+		CatalogID: "opencode-go",
+		APIKey:    "sk-configured",
+	})
+	if resolver != nil || loginKey != "" {
+		t.Fatalf("stored API key must win over auth.json, got resolver=%v loginKey=%q", resolver != nil, loginKey)
+	}
+}

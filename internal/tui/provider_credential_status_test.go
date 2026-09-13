@@ -59,6 +59,14 @@ func TestProviderCredentialRequiredCustomEndpoint(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "opencode-go still requires an OpenCode credential, not a Zero API key",
+			profile: config.ProviderProfile{
+				Name:      "opencode-go",
+				CatalogID: "opencode-go",
+			},
+			want: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -36,6 +36,16 @@ func TestValidateProviderRuntimeReadyCustomEndpoint(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "opencode-go ambient auth.json does not require an API key",
+			profile: config.ProviderProfile{
+				Name:      "opencode-go",
+				CatalogID: "opencode-go",
+				BaseURL:   "https://opencode.ai/zen/go/v1",
+				Model:     "deepseek-v4-pro",
+			},
+			wantErr: false,
+		},
+		{
 			name: "custom openai compatible with stale legacy default env",
 			profile: config.ProviderProfile{
 				Name:      "local-llama",
