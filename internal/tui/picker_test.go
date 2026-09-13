@@ -1515,3 +1515,69 @@ func TestSwitchProviderModelRejectsClineWithoutAppSession(t *testing.T) {
 		t.Fatalf("must not send Cline users to zero auth login, got %q", text)
 	}
 }
+
+func TestSwitchProviderModelUsesOpenCodeGoAuthJSON(t *testing.T) {
+	t.Setenv("OPENCODE_API_KEY", "")
+	t.Setenv(config.ActiveProviderEnv, "")
+	auth := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(auth, []byte(`{"opencode-go":{"type":"api","key":"sk-opencode-go-test"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OPENCODE_AUTH_PATH", auth)
+
+	var built config.ProviderProfile
+	m := newModel(context.Background(), Options{
+		ProviderName:    "opengateway",
+		ModelName:       "some-model",
+		Provider:        &fakeProvider{},
+		ProviderProfile: config.ProviderProfile{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+		SavedProviders: []config.ProviderProfile{
+			{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+			{Name: "opencode-go", CatalogID: "opencode-go", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://opencode.ai/zen/go/v1", Model: "deepseek-v4-pro"},
+		},
+		NewProvider: func(profile config.ProviderProfile) (zeroruntime.Provider, error) {
+			built = profile
+			return &fakeProvider{}, nil
+		},
+	})
+
+	next, text, ok, _ := m.switchProviderModel("opencode-go", "deepseek-v4-pro")
+	if !ok || !strings.Contains(text, "Switched to opencode-go") {
+		t.Fatalf("switch should succeed on OpenCode auth.json, got %q (ok=%v)", text, ok)
+	}
+	if next.providerName != "opencode-go" {
+		t.Fatalf("providerName = %q, want opencode-go", next.providerName)
+	}
+	if built.APIKey != "" {
+		t.Fatalf("OpenCode key must not be inlined as APIKey, got %q", built.APIKey)
+	}
+}
+
+func TestSwitchProviderModelRejectsOpenCodeGoWithoutAuthJSON(t *testing.T) {
+	t.Setenv("OPENCODE_API_KEY", "")
+	t.Setenv(config.ActiveProviderEnv, "")
+	t.Setenv("OPENCODE_AUTH_PATH", filepath.Join(t.TempDir(), "missing.json"))
+
+	m := newModel(context.Background(), Options{
+		ProviderName:    "opengateway",
+		ModelName:       "some-model",
+		Provider:        &fakeProvider{},
+		ProviderProfile: config.ProviderProfile{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+		SavedProviders: []config.ProviderProfile{
+			{Name: "opengateway", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://gateway.example.com/v1", Model: "some-model"},
+			{Name: "opencode-go", CatalogID: "opencode-go", ProviderKind: config.ProviderKindOpenAICompatible, BaseURL: "https://opencode.ai/zen/go/v1", Model: "deepseek-v4-pro"},
+		},
+		NewProvider: func(config.ProviderProfile) (zeroruntime.Provider, error) {
+			t.Fatal("newProvider must not run without an OpenCode key")
+			return nil, nil
+		},
+	})
+
+	_, text, ok, _ := m.switchProviderModel("opencode-go", "deepseek-v4-pro")
+	if ok || !strings.Contains(text, "OpenCode") {
+		t.Fatalf("expected an OpenCode auth hint, got %q (ok=%v)", text, ok)
+	}
+	if strings.Contains(text, "zero auth login") {
+		t.Fatalf("must not send OpenCode Go users to zero auth login, got %q", text)
+	}
+}

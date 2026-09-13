@@ -73,6 +73,14 @@ func TestModelsAreProviderScoped(t *testing.T) {
 			notWant: []string{"openai/gpt-4.1", "claude-sonnet-4.5"},
 		},
 		{
+			provider: "opencode-go",
+			want: []string{
+				"deepseek-v4-pro", "deepseek-v4-flash", "glm-5.2", "kimi-k2.7-code",
+				"minimax-m3", "qwen3.7-max", "qwen3.8-max", "mimo-v2.5-pro", "grok-4.5",
+			},
+			notWant: []string{"gpt-4.1", "claude-sonnet-4.5", "openai/gpt-4.1"},
+		},
+		{
 			provider: "opencode-go-anthropic-compatible",
 			want:     []string{"minimax-m3", "minimax-m2.7", "qwen3.7-plus", "qwen3.7-max"},
 			notWant:  []string{"gpt-4.1", "claude-sonnet-4.5", "deepseek-chat"},

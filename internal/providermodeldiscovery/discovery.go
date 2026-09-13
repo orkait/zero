@@ -16,6 +16,7 @@ import (
 	"github.com/Gitlawb/zero/internal/providermodelcatalog"
 	"github.com/Gitlawb/zero/internal/providers/cline"
 	"github.com/Gitlawb/zero/internal/providers/openai"
+	"github.com/Gitlawb/zero/internal/providers/opencode"
 	"github.com/Gitlawb/zero/internal/providers/providerio"
 	"github.com/Gitlawb/zero/internal/redaction"
 )
@@ -557,10 +558,11 @@ func mergeLiveModels(provider providercatalog.Descriptor, liveModels []Model, ca
 		byID[model.ID] = model
 	}
 	hasCatalog := len(byID) > 0
-	// Aggregators publish the live list as the source of truth. Keep live-only
-	// ids even when a remote catalog also loaded, instead of intersecting.
+	// Aggregators and OpenCode Go publish the live list as the source of truth.
+	// Keep live-only ids even when a remote catalog also loaded, instead of intersecting.
 	preferLive := providermodelcatalog.PublicLiveCatalog(provider.ID) ||
-		providercatalog.NormalizeID(provider.ID) == "chatgpt"
+		providercatalog.NormalizeID(provider.ID) == "chatgpt" ||
+		providercatalog.NormalizeID(provider.ID) == opencode.ID
 	result := make([]Model, 0, len(liveModels))
 	for _, live := range liveModels {
 		if catalog, ok := byID[live.ID]; ok {

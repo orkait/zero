@@ -43,6 +43,49 @@ func TestDiscoverClineUsesCuratedCatalogWithoutLiveProbe(t *testing.T) {
 	}
 }
 
+func TestDiscoverCatalogOpenCodeGoProbesLiveModels(t *testing.T) {
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[
+			{"id":"deepseek-v4-pro","object":"model"},
+			{"id":"live-only-go-model","object":"model"}
+		]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	provider, err := providercatalog.Require("opencode-go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	models, err := DiscoverCatalog(context.Background(), provider, config.ProviderProfile{
+		Name:         "opencode-go",
+		CatalogID:    "opencode-go",
+		ProviderKind: config.ProviderKindOpenAICompatible,
+		BaseURL:      server.URL + "/v1",
+		Model:        "deepseek-v4-pro",
+	}, Options{
+		HTTPClient: server.Client(),
+		OAuthResolver: func(context.Context, bool) (string, string, bool, error) {
+			return "Authorization", "Bearer sk-opencode-go-test", true, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("DiscoverCatalog: %v", err)
+	}
+	if gotAuth != "Bearer sk-opencode-go-test" {
+		t.Fatalf("Authorization = %q, want ambient OpenCode bearer", gotAuth)
+	}
+	got := strings.Join(modelIDs(models), ",")
+	if !strings.Contains(got, "deepseek-v4-pro") || !strings.Contains(got, "live-only-go-model") {
+		t.Fatalf("models = %q, want curated default plus live-only id", got)
+	}
+}
+
 func TestDiscoverOpenAICompatibleModelsFetchesModelsEndpoint(t *testing.T) {
 	const apiKey = "sk-live-secret"
 	var gotPath string

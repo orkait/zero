@@ -173,6 +173,43 @@ func TestClineDescriptor(t *testing.T) {
 	}
 }
 
+func TestOpenCodeGoDescriptor(t *testing.T) {
+	descriptor, err := Require("opencode-go")
+	if err != nil {
+		t.Fatalf("Require(opencode-go) error = %v", err)
+	}
+	if descriptor.Name != "OpenCode Go" {
+		t.Fatalf("Name = %q, want OpenCode Go", descriptor.Name)
+	}
+	if descriptor.DefaultBaseURL != "https://opencode.ai/zen/go/v1" {
+		t.Fatalf("DefaultBaseURL = %q, want OpenCode Go gateway", descriptor.DefaultBaseURL)
+	}
+	if descriptor.DefaultModel != "deepseek-v4-pro" {
+		t.Fatalf("DefaultModel = %q, want deepseek-v4-pro", descriptor.DefaultModel)
+	}
+	if descriptor.Transport != TransportOpenAICompatible {
+		t.Fatalf("Transport = %q, want %q", descriptor.Transport, TransportOpenAICompatible)
+	}
+	if descriptor.RequiresAuth != true {
+		t.Fatal("OpenCode Go should require auth (ambient OpenCode auth.json key)")
+	}
+	if !descriptor.UsesAmbientAuth {
+		t.Fatal("OpenCode Go should use the OpenCode CLI auth.json credential")
+	}
+	if len(descriptor.AuthEnvVars) != 0 {
+		t.Fatalf("AuthEnvVars = %#v, want empty (no API-key wizard step)", descriptor.AuthEnvVars)
+	}
+	if descriptor.OAuth {
+		t.Fatal("OpenCode Go must not use Zero's in-app OAuth; OpenCode owns login")
+	}
+	if descriptor.Local || descriptor.Custom {
+		t.Fatal("OpenCode Go is a remote subscription gateway, not a local or custom endpoint")
+	}
+	if alias, ok := Get("opencode go"); !ok || alias.ID != "opencode-go" {
+		t.Fatalf("alias opencode go = %+v", alias)
+	}
+}
+
 func TestHetznerDescriptor(t *testing.T) {
 	descriptor, err := Require("hetzner")
 	if err != nil {
