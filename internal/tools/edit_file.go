@@ -102,10 +102,10 @@ func (tool editFileTool) RunWithOptions(ctx context.Context, args map[string]any
 	}
 
 	// Fuzzy fallback: when the exact string (and its CRLF translation) is absent,
-	// run a cascade of tolerant matchers (trimmed lines, block anchors, collapsed
-	// whitespace, indentation drift, escape normalization) to locate the span the
-	// model intended. Only a span that occurs literally in the file is accepted,
-	// so the replacement applied below is still exact.
+	// run a cascade of tolerant matchers (trimmed lines, collapsed whitespace,
+	// indentation drift, escape normalization) to locate the span the model
+	// intended. These transformations must preserve non-whitespace content; a
+	// merely similar interior is not safe to replace.
 	if occurrences == 0 {
 		findOld, findNew := oldString, newString
 		if strings.Contains(content, "\r\n") && !strings.Contains(findOld, "\r\n") {
@@ -140,7 +140,6 @@ func (tool editFileTool) RunWithOptions(ctx context.Context, args map[string]any
 		return errorResult(fileUnseenMessage(relativePath))
 	}
 
-	previouslySeenWhole := options.FileTracker.SeenWhole(absolutePath)
 	updated := strings.Replace(content, oldString, newString, 1)
 	replacedCount := 1
 	if replaceAll {
@@ -161,19 +160,33 @@ func (tool editFileTool) RunWithOptions(ctx context.Context, args map[string]any
 	// Optional format-on-write (ZERO_FORMAT_ON_WRITE). Must run BEFORE the
 	// FileTracker re-baseline: recording pre-format content would make the very
 	// next edit look like an external modification and trip the conflict guard.
-	updated = maybeFormatWrittenFile(ctx, absolutePath, updated)
+	formatting := maybeFormatWrittenFile(ctx, absolutePath, updated)
+	updated = formatting.Content
 	// Re-baseline to the content we just wrote so subsequent edits in this session
 	// compare against the current on-disk state, not the pre-edit version.
 	newInfo, _ := os.Stat(absolutePath)
-	options.FileTracker.Record(absolutePath, []byte(updated), newInfo)
 	if updated == modelKnownContent {
-		if previouslySeenWhole {
-			options.FileTracker.RecordSeenRange(absolutePath, 1, lineCount(updated), lineCount(updated))
-		} else {
-			for _, span := range editedSpans {
-				options.FileTracker.RecordSeenBytes(absolutePath, span.start, span.end, len(updated))
-			}
+		// OUR edit, so we know precisely which lines moved: RecordEdit carries
+		// across the reads this edit did not disturb instead of dropping them.
+		//
+		// Record would drop all of them, and did — a file read in three pieces
+		// lost every piece to a single two-line edit, and the next six edits into
+		// regions that had been read were refused as unseen. See RecordEdit.
+		//
+		// This SUBSUMES the previouslySeenWhole special-case #956 added here.
+		// That branch re-recorded 1..total when the file had been read whole;
+		// RecordEdit does the same thing one level down (its seenWhole arm
+		// re-baselines as a single covering observation) and additionally keeps
+		// the partial reads the old else-branch discarded. Two copies of the
+		// rule would drift, and only one of them sees the pre-edit observation.
+		options.FileTracker.RecordEdit(absolutePath, []byte(content), []byte(updated), newInfo)
+		for _, span := range editedSpans {
+			options.FileTracker.RecordSeenBytes(absolutePath, span.start, span.end, len(updated))
 		}
+	} else {
+		// A formatter rewrote the file after us. We no longer know which line
+		// holds what was read, so the conservative drop is the right answer here.
+		options.FileTracker.Record(absolutePath, []byte(updated), newInfo)
 	}
 
 	suffix := ""
@@ -181,6 +194,7 @@ func (tool editFileTool) RunWithOptions(ctx context.Context, args map[string]any
 		suffix = "s"
 	}
 	summary := fmt.Sprintf("Successfully edited %s (replaced %d occurrence%s).", relativePath, replacedCount, suffix)
+	summary += formatting.notice(relativePath)
 	summary += inlineDiagnostics(ctx, options, absolutePath, relativePath)
 	result := okResult(summary)
 	result.ChangedFiles = []string{relativePath}

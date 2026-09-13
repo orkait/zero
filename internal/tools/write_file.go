@@ -114,13 +114,14 @@ func (tool writeFileTool) RunWithOptions(ctx context.Context, args map[string]an
 	// Optional format-on-write (ZERO_FORMAT_ON_WRITE). Must run BEFORE the
 	// FileTracker baseline: recording pre-format content would make the very
 	// next edit look like an external modification and trip the conflict guard.
-	content = maybeFormatWrittenFile(ctx, absolutePath, content)
+	formatting := maybeFormatWrittenFile(ctx, absolutePath, content)
+	content = formatting.Content
 	// Baseline the freshly written content so a later edit/overwrite in this
 	// session compares against what is now on disk.
 	newInfo, _ := os.Stat(absolutePath)
 	options.FileTracker.Record(absolutePath, []byte(content), newInfo)
 	if content == modelKnownContent {
-		options.FileTracker.RecordSeenRange(absolutePath, 1, lineCount(content), lineCount(content))
+		options.FileTracker.RecordSeenRange(absolutePath, 1, trackedLineTotal(content), trackedLineTotal(content))
 	}
 	if !existed {
 		options.FileTracker.RecordCreated(absolutePath)
@@ -137,6 +138,7 @@ func (tool writeFileTool) RunWithOptions(ctx context.Context, args map[string]an
 		lines++
 	}
 	summary := fmt.Sprintf("%s %s (%d lines).", verb, relativePath, lines)
+	summary += formatting.notice(relativePath)
 	summary += inlineDiagnostics(ctx, options, absolutePath, relativePath)
 	result := okResult(summary)
 	result.ChangedFiles = []string{relativePath}
