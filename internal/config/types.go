@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -119,6 +120,12 @@ type PreferencesConfig struct {
 	// the user turned idle recaps off. A *bool is its own tri-state, so no
 	// custom unmarshal is needed (unlike ToolsConfig.DeferThreshold's int).
 	Recaps *bool `json:"recaps,omitempty"`
+	// CompactionModel routes compaction summarization calls to this model
+	// instead of the session's main model (summaries at main-model prices are
+	// the most expensive recurring event in long runs). Empty = automatic: a
+	// curated cheap model on official endpoints, the main model elsewhere.
+	// "main" forces the main model. ZERO_COMPACTION_MODEL overrides.
+	CompactionModel string `json:"compactionModel,omitempty"`
 }
 
 // RecentModelEntry is one provider-qualified model selection recorded in
@@ -151,7 +158,8 @@ type KeyBindingsConfig struct {
 	ToggleMouse KeyBindingDef `json:"toggleMouse,omitempty"`
 	// CycleReasoning cycles through reasoning effort levels (default: ctrl+t).
 	CycleReasoning KeyBindingDef `json:"cycleReasoning,omitempty"`
-	// TogglePlan toggles the plan panel expansion (default: ctrl+p).
+	// TogglePlan is retained for configuration compatibility. Plan updates render
+	// in the transcript and no longer have a persistent panel to toggle.
 	TogglePlan KeyBindingDef `json:"togglePlan,omitempty"`
 	// ToggleSidebar toggles the right context sidebar (default: ctrl+b).
 	ToggleSidebar KeyBindingDef `json:"toggleSidebar,omitempty"`
@@ -356,6 +364,9 @@ type FileConfig struct {
 	LocalControl        LocalControlConfig `json:"localControl,omitempty"`
 	STT                 STTConfig          `json:"stt,omitempty"`
 	CrossSessionInbound string             `json:"crossSessionInbound,omitempty"`
+	// Extra preserves top-level fields written by newer Zero versions or
+	// extensions so a read-modify-write through this version is non-destructive.
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 func (cfg FileConfig) MarshalJSON() ([]byte, error) {
@@ -393,7 +404,32 @@ func (cfg FileConfig) MarshalJSON() ([]byte, error) {
 	if !cfg.STT.Empty() {
 		raw.STT = &cfg.STT
 	}
-	return json.Marshal(raw)
+	known, err := json.Marshal(raw)
+	if err != nil || len(cfg.Extra) == 0 {
+		return known, err
+	}
+	var merged map[string]json.RawMessage
+	if err := json.Unmarshal(known, &merged); err != nil {
+		return nil, err
+	}
+	for key, value := range cfg.Extra {
+		if !fileConfigKnownJSONKey(key) {
+			merged[key] = value
+		}
+	}
+	return json.Marshal(merged)
+}
+
+func fileConfigKnownJSONKey(key string) bool {
+	if strings.EqualFold(key, "mcpServers") || strings.EqualFold(key, "mcp_servers") {
+		return true
+	}
+	for _, field := range knownJSONFields(reflect.TypeOf(FileConfig{})) {
+		if strings.EqualFold(key, field.canonical) {
+			return true
+		}
+	}
+	return false
 }
 
 type ResolveOptions struct {
@@ -464,7 +500,7 @@ type MCPServerConfig struct {
 	// fields it set or what values they hold. A built-in default seeded by
 	// DefaultMCPServers() is never unmarshaled from JSON, so it starts false;
 	// any explicit entry in the user/project file — even one that happens to
-	// repeat a default's exact field values (e.g. re-declaring firecrawl's
+	// repeat a default's exact field values (e.g. re-declaring Exa's
 	// default URL) — sets it true. IsUnconfiguredDefault checks this alongside
 	// a resolved-value comparison, so redeclaring default values verbatim still
 	// counts as user-configured.
@@ -509,6 +545,18 @@ func (cfg *FileConfig) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	var extra map[string]json.RawMessage
+	if err := json.Unmarshal(data, &extra); err != nil {
+		return err
+	}
+	for key := range extra {
+		if fileConfigKnownJSONKey(key) {
+			delete(extra, key)
+		}
+	}
+	if len(extra) == 0 {
+		extra = nil
+	}
 	cfg.ActiveProvider = raw.ActiveProvider
 	cfg.Providers = raw.Providers
 	// A negative maxTurns is unambiguously invalid; without this it would be
@@ -530,6 +578,7 @@ func (cfg *FileConfig) UnmarshalJSON(data []byte) error {
 	cfg.LocalControl = raw.LocalControl
 	cfg.STT = raw.STT
 	cfg.CrossSessionInbound = raw.CrossSessionInbound
+	cfg.Extra = extra
 	if cfg.MCP.Servers == nil && (len(raw.MCPServers) > 0 || len(raw.MCPServersSnake) > 0) {
 		cfg.MCP.Servers = map[string]MCPServerConfig{}
 	}

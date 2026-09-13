@@ -215,6 +215,8 @@ var curatedModels = map[string][]Model{
 		{ID: "gpt-4.1", Description: "catalog default"},
 		{ID: "gpt-4o-mini", Description: "fast model"},
 	},
+	// atomic-chat-local has no curated list: discover the user-loaded model
+	// from the runtime's /v1/models endpoint.
 	"opencode-go": {
 		{ID: "deepseek-v4-pro", Description: "DeepSeek V4 Pro: catalog default"},
 		{ID: "deepseek-v4-flash", Description: "DeepSeek V4 Flash"},
